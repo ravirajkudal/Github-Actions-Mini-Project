@@ -2,39 +2,39 @@ name: Test CICD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
-jobs:
-  compile:
+jobs: # main container
+
+  compile: # step 1
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: maven
-    - name: Build with Maven
-      run: mvn -B package --file pom.xml
-  build:
-      name: Build
-      runs-on: ubuntu-24.04
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-        - name: Build an image from Dockerfile
-          run: docker build -t docker.io/my-organization/my-app:${{ github.sha }} .
-        - name: Run Trivy vulnerability scanner
-          uses: aquasecurity/trivy-action@v0.36.0
-          with:
-            image-ref: 'docker.io/my-organization/my-app:${{ github.sha }}'
-            format: 'table'
-            exit-code: '1'
-            ignore-unfixed: true
-            vuln-type: 'os,library'
-            severity: 'CRITICAL,HIGH'
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml
+
+  build: # step 2
+    name: Build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Install Trivy
+        run: |
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
   scan:
     name: Gitleaks Scan
     runs-on: ubuntu-latest
@@ -43,10 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Required ONLY for Organization accounts
-          
